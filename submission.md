@@ -1,7 +1,24 @@
 # Mixtape Bug Hunt Submission
 
+
+## AI Usage
+*Describe how you used AI tools during codebase navigation and debugging, what they helped you understand, and where you verified or overrode their output. Be specific about your prompts and how they helped you (e.g. asking for a function explanation, tracing a data flow). Also, describe at least one instance where the AI's explanation was incomplete or you had to course-correct.*
+
+**Codebase Orientation:**
+I used the AI assistant to help build a model of the repository before diving into the issues. I asked the AI to read through `app.py`, `models.py`, and the entire contents of the `routes/` and `services/` directories to generate high-level summaries of each file's responsibilities. For example, my prompts included requests like "Explain the architecture of this app.", "Help me summarize the files in routes and services." and "Make the summaries more detailed." I also asked the AI to generate an ER diagram of the database models. Prompts like, "Generate an ER diagram for this database schema." helped me visualize the relationships between tables.
+
+This collaboration saved a significant amount of time in understanding the architecture—specifically how the route controllers delegate business logic to the services layer—and it successfully traced exact data flows (like how a song rating reaches the database and generates a notification).
+
+**Bug Hunting and Test Generation:**
+During the bug hunting process, I utilized the AI assistant to help generate regression tests for the bugs we were fixing. For example, I asked the AI to "create a test for bug 2" and later to verify if notifications were correctly triggered in Bug 4. The AI successfully generated `tests/test_feed.py` and `tests/test_notifications.py`, saving me a lot of coding time. 
+
+**Course Correction:**
+There was an instance where I had to course-correct the AI. While generating the test for Bug 4 (`test_notifications.py`), the AI initially asserted against `notifs[0]["notification_type"]`. This caused a `KeyError` during testing because the `to_dict()` method in `models.py` actually maps that database column to the key `"type"`. I had to point out the `KeyError: 'notification_type'` failure to the AI, which then investigated the model and corrected the assertion to `notifs[0]["type"]`.
+
+
 **Project Summary:**
 This submission documents the investigation, root cause analysis, and resolution of multiple bugs within the **Mixtape** application, a social music platform for sharing songs and playlists. It includes a map of the codebase architecture, detailed root cause analyses for each fixed issue, verification of fixes, and documentation of the AI-assisted debugging process.
+
 
 ## App Structure
 
@@ -124,7 +141,7 @@ Knowing the issue was related to streaks, I opened `services/streak_service.py` 
 The code incorrectly included the condition `today.weekday() != 6` when verifying if the streak should increment for consecutive days. Because `weekday() == 6` corresponds to Sunday, any listening event occurring on a Sunday evaluated to false for the increment branch, causing the code to fall through to the `else` block which mistakenly resets the streak back to 1.
 
 **Your fix and side-effect check:**
-I removed the `and today.weekday() != 6` check from the `elif days_since_last == 1` statement. Now, any consecutive day correctly increments the streak regardless of the day of the week. I confirmed the fix didn't break anything by observing that the full `test_streaks.py` suite passed successfully. From the Streak rules, there isn't anything that would be impacted by removing the `today.weekday() != 6` check.  
+I removed the `and today.weekday() != 6` check from the `elif days_since_last == 1` statement. Now, any consecutive day correctly increments the streak regardless of the day of the week. I confirmed the fix didn't break anything by observing that the full `test_streaks.py` suite passed successfully. From the Streak rules, there isn't anything that would be impacted by removing the `today.weekday() != 6` check. To ensure this didn't break other streak logic, I verified that if a user listens after 2 or more days (days_since_last > 1), the code still correctly falls into the else block and resets the streak to 1. Removing the Sunday check only affected the consecutive day increment logic.  
 
 ---
 
@@ -196,33 +213,41 @@ I opened `services/playlist_service.py` to check the `get_playlist_songs` functi
 In `get_playlist_songs` within `playlist_service.py`, the return statement used python slicing `songs[:-1]`. Slicing a list this way drops the last element. Because of this, the final song in every playlist was not returned in the results.
 
 **Your fix and side-effect check:**
-I removed the `[:-1]` slice from the return statement in `get_playlist_songs`, changing it to just `return [song.to_dict() for song in songs]`. I then ran the test suite using `pytest tests/test_playlists.py` and verified that `test_playlist_returns_all_songs` passed, returning the correct number of songs. I also verified no other tests failed, confirming no unintended side effects.
+I removed the `[:-1]` slice from the return statement in `get_playlist_songs`, changing it to just `return [song.to_dict() for song in songs]`. I then ran the test suite using `pytest tests/test_playlists.py` and verified that `test_playlist_returns_all_songs` passed, returning the correct number of songs. I also verified no other tests failed, confirming no unintended side effects. I verified that if a playlist is completely empty (0 songs), the modified logic [song.to_dict() for song in songs] correctly returns an empty list [] instead of throwing an index or slice error. I also verified that a playlist with exactly 1 song correctly returns that 1 song instead of returning 0 songs.
 
 ---
 
 ## Regression Test
 *Reference a test you wrote that would have caught one of the fixed bugs before it was introduced. Briefly explain what behavior it verifies and why that test would have failed against the buggy code.*
 
-**Test File & Name:** 
-*e.g., `tests/test_streaks.py` -> `test_sunday_streak_reset()`*
+**Test File & Name (Example 1):** 
+`tests/test_notifications.py` -> `test_rate_song_creates_notification()`
 
 **Explanation:**
-*...*
+This test validates that when a user rates a song shared by another user, a "song_rated" notification is accurately generated for the original sharer. It does this by creating a mock song and two mock users, having the second user rate the song, and then verifying the original user's notification list length is exactly 1 with the correct type. Before the bug fix in `notification_service.py`, this test would fail because the notification list was completely empty (`0 == 1`), thereby catching the missing `create_notification` call in the rating logic.
+
+**Test File & Name (Example 2):** 
+`tests/test_feed.py` -> `test_friends_listening_now_excludes_old_events()`
+
+**Explanation:**
+This test validates that the "Listening Now" feed accurately enforces a 1-hour time threshold for listening events. It creates two scenarios: an event that happened 30 minutes ago, and an event that happened 2 hours ago. It asserts that only the 30-minute event shows up in the feed. Before the fix in `feed_service.py`, this test would fail on the 2-hour event check (it would return a list of length 1 instead of 0) because the service had a hardcoded `timedelta(hours=24)` threshold, causing yesterday's events to be incorrectly mixed into the "Listening Now" feed.
 
 ---
 
 ## Git Log Screenshot
-*Include a screenshot of `git log --oneline` on your `bugfix/mixtape` branch showing separate commits for each bug fix (using the conventional commit format with a `fix:` prefix).*
 
-![Git Log Screenshot](./path-to-your-screenshot.png)
+![Git Log Screenshot](./git_log.png)
 
+![Github Commits](./commits.png)
 
-## AI Usage
-*Describe how you used AI tools during codebase navigation and debugging, what they helped you understand, and where you verified or overrode their output. Be specific about your prompts and how they helped you (e.g. asking for a function explanation, tracing a data flow). Also, describe at least one instance where the AI's explanation was incomplete or you had to course-correct.*
-
-**Codebase Orientation:**
-I used the AI assistant to help build a model of the repository before diving into the issues. I asked the AI to read through `app.py`, `models.py`, and the entire contents of the `routes/` and `services/` directories to generate high-level summaries of each file's responsibilities. For example, my prompts included requests like "Explain the architecture of this app.", "Help me summarize the files in routes and services." and "Make the summaries more detailed." I also asked the AI to generate an ER diagram of the database models. Prompts like, "Generate an ER diagram for this database schema." helped me visualize the relationships between tables.
-
-This collaboration saved a significant amount of time in understanding the architecture—specifically how the route controllers delegate business logic to the services layer—and it successfully traced exact data flows (like how a song rating reaches the database and generates a notification).
-
-*(Note: Remember to document your AI usage during the actual bug hunting here later, including at least one instance where you had to verify or correct the AI!)*
+Git Log Output:
+```
+268807c (HEAD -> bugfix/mixtape, origin/bugfix/mixtape) fix: removed splice on playlist_service to return full playlist
+b35c686 fix: updated notification_service notification logic for ratings
+54952a5 fix: updated search_service to return distinct results and implemented Tag search join
+b287591 fix: changed feed_service threshold to 1 hour
+8a9b572 fix: removed today.weekday != 6 check in streak_service.py so streak no longer resets on Sundays
+2dfdeaa (upstream/main, upstream/HEAD, origin/main, origin/HEAD, original, main) Add .gitignore file and update README with setup instructions
+7b64551 initial commit
+(.venv) 
+```
