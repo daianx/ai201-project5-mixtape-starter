@@ -130,19 +130,19 @@ I removed the `and today.weekday() != 6` check from the `elif days_since_last ==
 
 ### Bug 2
 **Issue Number and Title:** 
-*e.g., Issue #2: Friends Listening Now shows people from yesterday
+Issue #2: Friends Listening Now shows people from yesterday
 
 **How you reproduced it:**
-*...*
+I investigated the code for the `get_friends_listening_now` function in `feed_service.py` to understand how friends are included in the feed. The bug description stated that the feed was including events from yesterday. I mentally traced the logic and confirmed that the threshold allowed events from exactly up to 24 hours ago. I also had AI generate a test case to verify this (`tests/test_feed.py`), and it confirmed that the threshold was indeed set to 24 hours.
 
 **How you found the root cause:**
-*...*
+I opened the `services/feed_service.py` file and checked the `get_friends_listening_now` function. I saw a line `cutoff = datetime.now(timezone.utc) - RECENT_THRESHOLD` which is used to filter the recent events. `RECENT_THRESHOLD` is hardcoded to `timedelta(hours=24)` at the top of the file. 
 
 **The root cause:**
-*...*
+At the top of `feed_service.py`, `RECENT_THRESHOLD` is hardcoded to `timedelta(hours=24)`. This means that any listening event occurring within the last 24 hours was considered to be happening "now", causing yesterday's listening activity to be mixed into the real-time "Listening Now" feed.
 
 **Your fix and side-effect check:**
-*...*
+The "Now" in Friends Listening Now isn't defined in any of the provided documents, so I chose to define it as within the last hour. I changed `RECENT_THRESHOLD` from `timedelta(hours=24)` to `timedelta(hours=1)`, which ensures only events within the last hour show up in the "Listening Now" feed. To ensure this didn't break the global activity feed, I verified that the tests now run with no problems. 
 
 ---
 
