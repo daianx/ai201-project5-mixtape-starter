@@ -183,6 +183,20 @@ I added a block at the end of the `rate_song` function, before the commit, to ch
 ---
 
 ### Bug 5
+**Issue Number and Title:** 
+Issue #5: The last song in a playlist never shows up
+
+**How you reproduced it:**
+I reviewed `tests/test_playlists.py` and saw `test_playlist_returns_all_songs` which indicates that returning songs for a playlist with 5 songs should return exactly 5 songs. There was a comment on the test noting that it returned 4 instead of 5, which matched the bug description of the last song being missing.
+
+**How you found the root cause:**
+I opened `services/playlist_service.py` to check the `get_playlist_songs` function since that's what the failing test was calling. In the very last return statement, the list comprehension was slicing the list with `[:-1]`. This will cause the last song to be excluded from the returned list.
+
+**The root cause:**
+In `get_playlist_songs` within `playlist_service.py`, the return statement used python slicing `songs[:-1]`. Slicing a list this way drops the last element. Because of this, the final song in every playlist was not returned in the results.
+
+**Your fix and side-effect check:**
+I removed the `[:-1]` slice from the return statement in `get_playlist_songs`, changing it to just `return [song.to_dict() for song in songs]`. I then ran the test suite using `pytest tests/test_playlists.py` and verified that `test_playlist_returns_all_songs` passed, returning the correct number of songs. I also verified no other tests failed, confirming no unintended side effects.
 
 ---
 
