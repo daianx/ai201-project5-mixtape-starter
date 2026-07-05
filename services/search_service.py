@@ -25,12 +25,15 @@ def search_songs(query: str) -> list[dict]:
     results = (
         db.session.query(Song)
         .outerjoin(song_tags, Song.id == song_tags.c.song_id)
+        .outerjoin(Tag, song_tags.c.tag_id == Tag.id)
         .filter(
             db.or_(
                 Song.title.ilike(f"%{query}%"),
                 Song.artist.ilike(f"%{query}%"),
+                Tag.name.ilike(f"%{query}%"),
             )
         )
+        .distinct()
         .all()
     )
 

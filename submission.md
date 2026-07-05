@@ -148,55 +148,24 @@ The "Now" in Friends Listening Now isn't defined in any of the provided document
 
 ### Bug 3
 **Issue Number and Title:** 
-*e.g., Issue #3: The same song keeps showing up twice in search*
+Issue #3: The same song keeps showing up twice in search
 
 **How you reproduced it:**
-*...*
+I ran `tests/test_search.py` which contains a test called `test_search_no_duplicates_multi_tag_song`. The test comment indicates that a song with multiple tags returns duplicates in the search results (e.g., 3 results instead of 1). This test initially failed.
 
 **How you found the root cause:**
-*...*
+I opened `services/search_service.py` to inspect the `search_songs` function. I saw that the SQL query was doing an outer join with `song_tags`, but it was missing a `.distinct()` call. Additionally, according to the docstring, it was supposed to search by tag names, but the query lacked a join to the `Tag` table and the tag filter entirely.
 
 **The root cause:**
-*...*
+The query in `search_songs` was missing a `.distinct()` clause. Because it was joining the `song_tags` table, a song with multiple tags would return a row for each tag from the database. Without `.distinct()`, this resulted in the same song appearing multiple times in the search results. Additionally, the query was missing the ability to search by tag names, which requires joining the `Tag` table and filtering on `Tag.name`.
 
 **Your fix and side-effect check:**
-*...*
+I modified the SQL query in `services/search_service.py` to add `.outerjoin(Tag, song_tags.c.tag_id == Tag.id)` and included `Tag.name.ilike(f"%{query}%")` inside the `db.or_` filter to implement the tag search functionality. I also added a `.distinct()` call to the query just before `.all()` to make sure that even if a song matches multiple tags, it will only be returned once. I verified this didn't break existing search features by running `pytest tests/test_search.py` and confirming all tests passed, including the duplication test.
 
 ---
 
-### Bug 4 (Optional for 4th bug credit)
-**Issue Number and Title:** 
-*...*
+### Bug 4 
 
-**How you reproduced it:**
-*...*
-
-**How you found the root cause:**
-*...*
-
-**The root cause:**
-*...*
-
-**Your fix and side-effect check:**
-*...*
-
----
-
-### Bug 5 (Optional for 5th bug credit)
-**Issue Number and Title:** 
-*...*
-
-**How you reproduced it:**
-*...*
-
-**How you found the root cause:**
-*...*
-
-**The root cause:**
-*...*
-
-**Your fix and side-effect check:**
-*...*
 
 ---
 
