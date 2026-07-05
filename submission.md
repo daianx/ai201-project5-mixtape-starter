@@ -165,7 +165,24 @@ I modified the SQL query in `services/search_service.py` to add `.outerjoin(Tag,
 ---
 
 ### Bug 4 
+**Issue Number and Title:** 
+Issue #4: I got notified when a friend added my song to a playlist but not when they rated it
 
+**How you reproduced it:**
+I created a new test file, `tests/test_notifications.py`, and wrote a test `test_rate_song_creates_notification` to verify if a notification is generated when a friend rates a song. As expected, the test failed initially because `get_notifications()` returned an empty list.
+
+**How you found the root cause:**
+I opened `services/notification_service.py` and compared the `add_to_playlist` function with the `rate_song` function. The `add_to_playlist` function correctly checks if the current user isn't the original sharer, and calls `create_notification` to notify them. However, the `rate_song` function was missing this logic.
+
+**The root cause:**
+The `rate_song` function in `notification_service.py` successfully saved or updated the `Rating` object in the database, but it was missing the code to trigger a notification. This means that when a user rates a song, the original sharer is not notified. 
+
+**Your fix and side-effect check:**
+I added a block at the end of the `rate_song` function, before the commit, to check `if song.shared_by != user_id:`. If true, it calls `create_notification` with a "song_rated" type and a descriptive message indicating the score given. I verified the fix by running my new `tests/test_notifications.py` test suite, which passed successfully, confirming that rating a song now correctly notifies the original sharer. No side effects were observed as the fix does not interfere with any existing functionality. 
+
+---
+
+### Bug 5
 
 ---
 
